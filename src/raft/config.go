@@ -81,13 +81,13 @@ func make_config(t *testing.T, n int, unreliable bool) *config {
 
 	cfg.net.LongDelays(true)
 
-	// create a full set of Rafts.
+	// create a full set of Rafts.启动所有raft节点
 	for i := 0; i < cfg.n; i++ {
 		cfg.logs[i] = map[int]interface{}{}
 		cfg.start1(i)
 	}
 
-	// connect everyone
+	// connect everyone 在 StartAll() 方法中，还需要让每个节点连接其他节点的 RPC 客户端和服务端。这里使用了 Raft 库提供的 Connect() 方法：
 	for i := 0; i < cfg.n; i++ {
 		cfg.connect(i)
 	}

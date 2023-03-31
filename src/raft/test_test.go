@@ -21,30 +21,35 @@ const RaftElectionTimeout = 1000 * time.Millisecond
 
 func TestInitialElection2A(t *testing.T) {
 	servers := 3
+	//这段代码是用于初始化一个 Raft 集群的配置对象，它接收三个参数：测试对象 t、集群中服务器的数量 servers 和一个布尔型变量（第三个参数为 false）。
+	//
+	//make_config 函数会创建并返回一个名为 config 的 Config 实例，该实例包含多个 Raft 服务器实例以及一些辅助方法，这些方法可以在测试过程中检查集群状态、模拟网络故障和恢复等操作。在测试结束时，必须调用 config.cleanup() 方法来释放资源。
+	//
+	//整个测试过程分为两个部分，分别对应两个测试函数 TestInitialElection2A 和 TestReElection2A。在每个测试函数中，都会使用 make_config 函数来创建一个新的 Raft 集群配置，然后进行相关的测试操作。
 	cfg := make_config(t, servers, false)
 	defer cfg.cleanup()
 
 	cfg.begin("Test (2A): initial election")
 
-	// is a leader elected?
+	// 是否选举出了一个领导者？
 	cfg.checkOneLeader()
+	fmt.Println("选举出了一个领导者")
 
-	// sleep a bit to avoid racing with followers learning of the
-	// election, then check that all peers agree on the term.
+	//为了避免与从节点学习选举结果竞争，等待一段时间后检查所有节点是否在选举中达成一致（即，它们同意的任期编号相同
 	time.Sleep(50 * time.Millisecond)
 	term1 := cfg.checkTerms()
 	if term1 < 1 {
 		t.Fatalf("term is %v, but should be at least 1", term1)
 	}
 
-	// does the leader+term stay the same if there is no network failure?
+	// 如果没有网络故障，领导者和任期编号是否保持不变？
 	time.Sleep(2 * RaftElectionTimeout)
 	term2 := cfg.checkTerms()
 	if term1 != term2 {
-		fmt.Printf("warning: term changed even though there were no failures")
+		fmt.Printf("尽管没有出现故障，但任期编号发生了变化")
 	}
 
-	// there should still be a leader.
+	// 在执行完一定时间后，应该仍存在一个领导者。
 	cfg.checkOneLeader()
 
 	cfg.end()
@@ -59,27 +64,25 @@ func TestReElection2A(t *testing.T) {
 
 	leader1 := cfg.checkOneLeader()
 
-	// if the leader disconnects, a new one should be elected.
+	// 如果领导者失去连接，应该会选举出一个新的领导者。
 	cfg.disconnect(leader1)
 	cfg.checkOneLeader()
 
-	// if the old leader rejoins, that shouldn't
-	// disturb the new leader.
+	//如果旧的领导者重新加入集群，不应该干扰新的领导者。
 	cfg.connect(leader1)
 	leader2 := cfg.checkOneLeader()
 
-	// if there's no quorum, no leader should
-	// be elected.
+	//如果没有足够的节点构成多数派，就不会选举出领导者。
 	cfg.disconnect(leader2)
 	cfg.disconnect((leader2 + 1) % servers)
 	time.Sleep(2 * RaftElectionTimeout)
 	cfg.checkNoLeader()
 
-	// if a quorum arises, it should elect a leader.
+	// 如果多数派节点重新出现，它们应该能够选举出一个领导者。
 	cfg.connect((leader2 + 1) % servers)
 	cfg.checkOneLeader()
 
-	// re-join of last node shouldn't prevent leader from existing.
+	// 最后一个节点重新加入集群不应该妨碍领导者的选举。
 	cfg.connect(leader2)
 	cfg.checkOneLeader()
 
