@@ -415,9 +415,10 @@ func Make(peers []*labrpc.ClientEnd, me int,
 				case <-rf.electionTimer.C:
 					fmt.Println("节点", rf.me, "选举超时")
 					rf.mu.Lock()
-					// 超时后切换为候选人状态
 					rf.status = Candidate
 					rf.mu.Unlock()
+				default:
+					time.Sleep(10 * time.Millisecond)
 				}
 			case Candidate:
 				fmt.Println("节点", rf.me, "成为候选人")
@@ -474,12 +475,13 @@ func Make(peers []*labrpc.ClientEnd, me int,
 				}
 				time.Sleep(10 * time.Millisecond) // 减少竞争，避免出现死锁
 			case Leader:
+				rf.mu.Lock()
+				rf.broadcastAppendEntries()
 				//在Raft协议中，一旦一个节点成为leader，它需要周期性地向其它节点发送心跳消息（AppendEntries RPC）以保持自己的领导地位。这个周期性发送心跳消息的时间间隔称为“心跳间隔”（heartbeat interval），是一个固定的时间段。
 				fmt.Println("节点", rf.me, "成为领导人")
-				rf.broadcastAppendEntries()
+				rf.mu.Unlock()
 				time.Sleep(HeartBeatTimeout)
 			}
-
 		}
 	}()
 
