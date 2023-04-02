@@ -238,11 +238,13 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
-	fmt.Println("节点", rf.me, "准备添加日志", "节点", rf.me, "当前任期为", rf.currentTerm, "当前状态为", rf.status, "请求节点任期为：", args.Term, "请求节点ID为", args.LeaderId)
+	fmt.Println("节点", rf.me, "请求添加日志", "请求节点", rf.me, "当前任期为", rf.currentTerm, "当前状态为", rf.status, "追加节点任期为：", args.Term, "追加节点ID为", args.LeaderId)
 	// 如果对方节点的 term 比当前节点大，则更新当前节点的 term，并变成 follower
 	if args.Term > rf.currentTerm {
 		rf.currentTerm = args.Term
 		rf.status = Follower
+		rf.resetElectionTimer()
+		fmt.Println("因为对方节点的 term 比当前节点大，则更新当前节点的 term，并变成 follower，重置选举计时器")
 		fmt.Println("节点", rf.me, "更新任期为", rf.currentTerm, "当前状态为", rf.status)
 		rf.voteFor = -1
 	}
@@ -271,6 +273,8 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 		if rf.logs[index].Term != entry.Term {
 			rf.logs[index] = entry
 		}
+		//rf.resetElectionTimer()
+		//fmt.Println("因为日志匹配,收到消息，重置选举计时器")
 	}
 
 	// 更新 commitIndex
@@ -285,6 +289,8 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	fmt.Println("节点", rf.me, "添加日志成功", "节点", rf.me, "当前任期为", rf.currentTerm, "当前状态为", rf.status, "请求节点任期为：", args.Term, "请求节点ID为", args.LeaderId)
 	// 设置响应结果
 	reply.Success = true
+	rf.resetElectionTimer()
+	fmt.Println("因为日志匹配,收到消息，重置选举计时器")
 	reply.ConflictIndex = -1
 }
 
@@ -429,7 +435,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 				rf.voteFor = rf.me
 				votesReceived := 1
 				rf.resetElectionTimer()
-				rf.mu.Unlock()
+
 				// 向其他服务器发送投票请求
 				for i := range rf.peers {
 					if i != rf.me && rf.killed() == false {
@@ -473,12 +479,13 @@ func Make(peers []*labrpc.ClientEnd, me int,
 						}(i)
 					}
 				}
+				rf.mu.Unlock()
 				time.Sleep(10 * time.Millisecond) // 减少竞争，避免出现死锁
 			case Leader:
 				rf.mu.Lock()
 				rf.broadcastAppendEntries()
 				//在Raft协议中，一旦一个节点成为leader，它需要周期性地向其它节点发送心跳消息（AppendEntries RPC）以保持自己的领导地位。这个周期性发送心跳消息的时间间隔称为“心跳间隔”（heartbeat interval），是一个固定的时间段。
-				fmt.Println("节点", rf.me, "成为领导人")
+				fmt.Println("节点", rf.me, "是领导人")
 				rf.mu.Unlock()
 				time.Sleep(HeartBeatTimeout)
 			}
@@ -495,7 +502,7 @@ func (rf *Raft) broadcastAppendEntries() {
 		if i != rf.me && rf.killed() == false {
 			go func(server int) {
 				// 创建 AppendEntriesArgs 结构体
-				fmt.Println("节点", rf.me, "前一个日志：", rf.nextIndex[server]-1, rf.logs[rf.nextIndex[server]-1].Term)
+				//fmt.Println("节点", rf.me, "前一个日志：", rf.nextIndex[server]-1, rf.logs[rf.nextIndex[server]-1].Term)
 				args := &AppendEntriesArgs{
 					Term:         rf.currentTerm,
 					LeaderId:     rf.me,
