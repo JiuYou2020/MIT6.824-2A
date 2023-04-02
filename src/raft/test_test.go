@@ -43,8 +43,10 @@ func TestInitialElection2A(t *testing.T) {
 	}
 
 	// 如果没有网络故障，领导者和任期编号是否保持不变？
+	fmt.Println("测试前节点的任期编号为：", term1)
 	time.Sleep(2 * RaftElectionTimeout)
 	term2 := cfg.checkTerms()
+	fmt.Println("测试后节点的任期编号为：", term2)
 	if term1 != term2 {
 		fmt.Printf("尽管没有出现故障，但任期编号发生了变化")
 	}

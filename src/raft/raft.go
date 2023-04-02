@@ -39,7 +39,7 @@ type Status int
 type VoteStatus int
 
 //全局心跳超时时间
-var HeartBeatTimeout = 120 * time.Millisecond
+var HeartBeatTimeout = 100 * time.Millisecond
 
 //raft节点类型：跟随者，竞选者，领导者
 const (
@@ -203,6 +203,7 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	if args.Term > rf.currentTerm {
 		rf.currentTerm = args.Term
 		rf.status = Follower
+		fmt.Println("节点", rf.me, "更新任期为", rf.currentTerm, "当前状态为", rf.status)
 		rf.voteFor = -1
 	}
 
@@ -242,6 +243,7 @@ func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply
 	if args.Term > rf.currentTerm {
 		rf.currentTerm = args.Term
 		rf.status = Follower
+		fmt.Println("节点", rf.me, "更新任期为", rf.currentTerm, "当前状态为", rf.status)
 		rf.voteFor = -1
 	}
 
@@ -309,7 +311,7 @@ func (rf *Raft) getLastIndexOfTerm(term int) int {
 // 查看../labrpc/labrpc.go中的注释，以获取更多详细信息。
 // 如果您发现RPC无法正常工作，请检查是否对通过RPC传输的结构体中的所有字段名称都使用了大写字母，并且调用方使用&而不是结构本身来传递响应结构体的地址。
 func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *RequestVoteReply) bool {
-	fmt.Println("节点", rf.me, "向节点", server, "请求投票，请求节点当前任期是", args.Term, "ID为", args.CandidateId, "自己最后一个日志号为", args.LastLogIndex, "自己最后一个任期为", args.LastLogTerm)
+	fmt.Println("节点", rf.me, "向节点", server, "请求投票，请求节点当前任期是", args.Term, "ID为", args.CandidateId, "请求节点最后一个日志号为", args.LastLogIndex, "请求节点最后一个日志的任期为", args.LastLogTerm)
 	ok := rf.peers[server].Call("Raft.RequestVote", args, reply)
 	return ok
 }
@@ -422,6 +424,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 				rf.mu.Lock()
 				// 成为候选人后增加任期号，重置选举计时器和投票记录，并发起自己的投票请求
 				rf.currentTerm += 1
+				fmt.Println("节点", rf.me, "任期号已经加1,现在为：", rf.currentTerm)
 				rf.voteFor = rf.me
 				votesReceived := 1
 				rf.resetElectionTimer()
@@ -447,6 +450,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 								if reply.Term > rf.currentTerm {
 									rf.currentTerm = reply.Term
 									rf.status = Follower
+									fmt.Println("节点", rf.me, "更新任期为", rf.currentTerm, "当前状态为", rf.status)
 									rf.voteFor = -1
 									return
 								}
@@ -542,6 +546,7 @@ func (rf *Raft) broadcastAppendEntries() {
 						if reply.Term > rf.currentTerm {
 							rf.currentTerm = reply.Term
 							rf.status = Follower
+							fmt.Println("节点", rf.me, "更新任期为", rf.currentTerm, "当前状态为", rf.status)
 							rf.voteFor = -1
 							return
 						} else {
